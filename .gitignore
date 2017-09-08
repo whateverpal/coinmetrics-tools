@@ -1,0 +1,7 @@
+*.xls#
+*.doc#
+*.pyc#
+*.pyc
+/web/mtv_data.js
+csv/
+etc.txt
