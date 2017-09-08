@@ -2,7 +2,7 @@
 from coincrawler import fetchBlocksFromServers, downloadUsdPriceData, dumpDailyStatsToCSV, DBAccess
 
 # create connection with database, specify database name, user and password
-db = DBAccess("cryptodata", "swt", "swt")
+db = DBAccess("dbname", "dbuser", "dbpassword")
 
 currency = "btc"
 
