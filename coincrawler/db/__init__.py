@@ -2,8 +2,8 @@ import psycopg2
 
 class DBAccess(object):
 
-	def __init__(self, dbName, dbUser, dbPassword):
-		self.connection = psycopg2.connect("host=127.0.0.1 dbname=%s user=%s password=%s" % (dbName, dbUser, dbPassword))
+	def __init__(self, dbHost, dbName, dbUser, dbPassword):
+		self.connection = psycopg2.connect("host=%s dbname=%s user=%s password=%s" % (dbHost, dbName, dbUser, dbPassword))
 		self.cursor = self.connection.cursor()
 		print "DB connection established"
 

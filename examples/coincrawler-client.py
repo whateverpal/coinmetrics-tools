@@ -1,8 +1,8 @@
 # example of fetching bitcoin blocks from coincrawler-server
 from coincrawler import fetchBlocksFromServers, downloadUsdPriceData, dumpDailyStatsToCSV, DBAccess
 
-# create connection with database, specify database name, user and password
-db = DBAccess("cryptodata", "swt", "swt")
+# create connection with database, specify database host, name, user and password
+db = DBAccess("dbhost", "dbname", "dbuser", "dbpassword")
 
 currency = "btc"
 
@@ -18,5 +18,5 @@ fetchBlocksFromServers(
 # fetch price, exchange volume from coinmarketcap
 downloadUsdPriceData(currency, db)
 
-# dump daily stats to csv/xem.csv
+# dump daily stats to csv/btc.csv
 dumpDailyStatsToCSV(currency, db)
