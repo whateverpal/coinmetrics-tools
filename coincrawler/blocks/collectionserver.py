@@ -1,101 +1,16 @@
-import BaseHTTPServer
 import threading
 import json
-import urllib
 import requests
 import time
 from datetime import datetime
 from coincrawler.blocks.downloaders import SerialDownloader
-from coincrawler.blocks.datasources import *
-
-class HttpServer(object):
-
-	class Handler(BaseHTTPServer.BaseHTTPRequestHandler):
-
-		def do_GET(self):
-			self.server.owner.processRequest(self)
-
-	def __init__(self, port):
-		self.server = BaseHTTPServer.HTTPServer(("0.0.0.0", port), HttpServer.Handler)
-		self.server.owner = self
-
-	def start(self):
-		self.thread = threading.Thread(None, self.threadFunc, "", ())
-		self.thread.start()
-		print "Http server started"
-
-	def stop(self):
-		self.server.shutdown()
-		self.thread.join()
-		print "Http server stopped"
-
-	def threadFunc(self):
-		self.server.serve_forever()
-
-	def processRequest(self, request):
-		return
+from coincrawler.network.server import NetworkServer
 
 
-class JobServer(HttpServer):
+class BlockCollectionServer(NetworkServer):
 
 	def __init__(self, port, dataSources, dataSourcesSleepBetweenRequests):
-		super(JobServer, self).__init__(port)
-		self.executor = BlockCollectionJobExecutor(dataSources, dataSourcesSleepBetweenRequests)
-
-	def stop(self):
-		HttpServer.stop(self)
-		self.executor.stop()
-
-	def processRequest(self, request):
-		jsonCommand = None
-		elements = request.path.split("/")
-		if len(elements) != 2:
-			return self.badRequest(request)
-		try:
-			jsonCommand = json.loads(urllib.unquote(elements[1]))
-		except Exception as e:
-			print e
-			return self.badRequest(request)
-
-		if not "method" in jsonCommand:
-			return self.badRequest(request)
-
-		params = jsonCommand["params"] if "params" in jsonCommand else []
-		if type(params) != list:
-			return self.badRequest(request)
-
-		result, error = self.executor.tryExecuteCommand(jsonCommand["method"], params)
-		if error is not None:
-			return self.badRequest(request, error)
-		else:
-			return self.respondOk(request, result)
-
-	def badRequest(self, request, error="Malformed request"):
-		request.send_response(400)
-		request.send_header("Content-type", "text/json")
-		request.end_headers()
-		request.wfile.write('{"error": "%s"}' % error)
-
-	def respondOk(self, request, payload):
-		request.send_response(200)
-		request.send_header("Content-type", "text/json")
-		request.end_headers()
-		request.wfile.write(json.dumps(payload))
-
-	def tryExecuteNewJobCommand(self, request, jobParams):
-		jobId, error = self.executor.tryStartJob(jobParams)
-		if error:
-			return self.badRequest(request, error)
-		else:
-			return self.respondOk(request, '{"jobId": %d}' % jobId)
-
-	def tryExecuteGetJobStatusCommand(self, request, jobId):
-		result = self.executor.tryGetJobStatus(int(jobId))
-		return self.respondOk(request, json.dumps(result))
-
-	def tryGetJobResult(self, request, jobId, blockStart, blockEnd):
-		result = self.executor.tryGetJobResult(int(jobId), int(blockStart), int(blockEnd))
-		return self.respondOk(request, json.dumps(result))
+		super(BlockCollectionServer, self).__init__(port, BlockCollectionJobExecutor(dataSources, dataSourcesSleepBetweenRequests))
 
 
 class BlockCollectionJobExecutor(object):
@@ -133,20 +48,23 @@ class BlockCollectionJobExecutor(object):
 			toRemove = []
 			for key, value in self.jobsLastAccess.iteritems():
 				print "gc thread: testing job %d, last access %d second(s) ago" % (key, (now - value).total_seconds())
-				if (now - value).total_seconds() > 60 * 60:
+				if (now - value).total_seconds() > 30 * 60:
 					toRemove.append(key)
 
 			for jobId in toRemove:
 				print "gc thread: emoving job %d due to timeout" % jobId
 				self.removeJob(jobId)
 
-			time.sleep(15)
+			time.sleep(20)
 
 	def removeJob(self, jobId):
-		print "removing job %d" % jobId
-		self.jobs[jobId].stop()
-		del self.jobs[jobId]
-		del self.jobsLastAccess[jobId]
+		if jobId in self.jobs:
+			print "removing job %d" % jobId
+			self.jobs[jobId].stop()
+			del self.jobs[jobId]
+			del self.jobsLastAccess[jobId]
+		else:
+			print "failed to remove non-existent job %s" % jobId
 
 	def tryExecuteCommand(self, commandName, params):
 		if not commandName in self.commandsRegistry:
@@ -164,7 +82,7 @@ class BlockCollectionJobExecutor(object):
 		sleepBetweenRequests = 0
 		if currency in self.dataSourcesSleepBetweenRequests:
 			sleepBetweenRequests = self.dataSourcesSleepBetweenRequests[currency]
-		self.jobs[self.jobCounter] = BlockCollectionJob(SerialDownloader(self.dataSources[currency](), sleepBetweenRequests=sleepBetweenRequests), fromHeight, toHeight)
+		self.jobs[self.jobCounter] = BlockCollectionJob(self.dataSources[currency], sleepBetweenRequests, fromHeight, toHeight)
 		self.jobs[self.jobCounter].start()
 		self.jobsLastAccess[self.jobCounter] = datetime.now()
 		return self.jobCounter, None
@@ -228,8 +146,9 @@ class BlockCollectionJobExecutor(object):
 
 class BlockCollectionJob(object):
 
-	def __init__(self, downloader, fromHeight, toHeight):
-		self.downloader = downloader
+	def __init__(self, source, sleepBetweenRequests, fromHeight, toHeight):
+		self.source = source
+		self.sleepBetweenRequests = sleepBetweenRequests
 		self.fromHeight = fromHeight
 		self.toHeight = toHeight
 		self.stopping = False
@@ -251,8 +170,9 @@ class BlockCollectionJob(object):
 
 	def threadFunc(self):
 		try:
+			downloader = SerialDownloader(self.source(), sleepBetweenRequests=self.sleepBetweenRequests)
 			steps = 0
-			for block in self.downloader.loadBlocks(range(self.fromHeight, self.toHeight + 1)):
+			for block in downloader.loadBlocks(range(self.fromHeight, self.toHeight + 1)):
 				steps += 1
 				self.progress = float(steps) / (self.toHeight - self.fromHeight + 1)
 				self.storage[block['height']] = block

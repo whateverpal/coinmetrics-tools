@@ -1,5 +1,5 @@
 from coincrawler.blocks.datasources import *
-from coincrawler import runJobServer
+from coincrawler import BlockCollectionServer
 
 # this server is able to fetch blocks for all supported cryptocurrencies
 # here we specify data source for each one
@@ -32,5 +32,5 @@ dataSourcesSleepBetweenRequests = {
 	"eth": 12
 }
 
-# run job server on port 13333 until keyboard interrupt is received
-runJobServer(13333, dataSources, dataSourcesSleepBetweenRequests)
+# run block collection server on port 13333 until keyboard interrupt is received
+BlockCollectionServer(13333, dataSources, dataSourcesSleepBetweenRequests).runEndlessly()

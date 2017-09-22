@@ -1,10 +1,11 @@
 import threading
 import time
+import traceback
 from datetime import datetime
 from collections import deque
 
 from coincrawler.utils.eta import BlockCollectionETA
-from coincrawler.blocks.jobclient import JobClient
+from coincrawler.network.client import NetworkClient
 
 def prettyPrintBlock(block):
 	blockCopy = {k: v for k, v in block.iteritems()}
@@ -51,9 +52,10 @@ class SerialDownloader(IDownloader):
 				try:
 					block = self.dataSource.getBlock(height)
 				except Exception as e:
+					print traceback.format_exc()
 					if retries < 5:
 						retries += 1
-						print "failed to getblock, retrying"
+						print "failed to get block, retrying"
 						time.sleep(2 * self.sleepBetweenRequests)
 					else:
 						raise e
@@ -73,7 +75,7 @@ class NetworkDownloader(IDownloader):
 		self.etaReportInterval = etaReportInterval
 		self.sleepBetweenRequests = sleepBetweenRequests
 		self.amountPerRequest = amountPerRequest
-		self.client = JobClient(host, port)
+		self.client = NetworkClient(host, port)
 
 	def getBlockHeight(self):
 		result, error = self.client.issueCommand("getNetworkBlockHeight", self.currency)
@@ -133,11 +135,18 @@ class MultisourceDownloader(IDownloader):
 		self.etaMaxObservations = etaMaxObservations
 		self.etaReportInterval = etaReportInterval
 
+		self.jobs = deque()
+		self.jobsLock = threading.Lock()
+
+		self.deadDownloadersCount = 0
+		self.deadDownloadersCountLock = threading.Lock()
+
 	def getBlockHeight(self):
 		return self.downloaders[0].getBlockHeight()
 
 	def loadBlocks(self, blocksList):
-		self.jobs = deque()
+		self.working = True
+
 		n = 0
 		while n < len(blocksList):
 			batch = []
@@ -147,7 +156,6 @@ class MultisourceDownloader(IDownloader):
 			self.jobs.append(batch)
 
 		self.threads = []
-		self.lock = threading.Lock()
 		self.results = {}
 		self.currentBlock = blocksList[0]
 		for downloader in self.downloaders:
@@ -158,32 +166,45 @@ class MultisourceDownloader(IDownloader):
 		eta = BlockCollectionETA(len(blocksList), self.etaMaxObservations, self.etaReportInterval)
 		eta.workStarted()
 		while self.currentBlock != blocksList[-1] + 1:
+			if len(self.downloaders) == self.deadDownloadersCount:
+				raise Exception("all downloaders are dead")
+
 			while self.currentBlock in self.results:
 				print "downloaded block %s" % prettyPrintBlock(self.results[self.currentBlock])
 				yield self.results[self.currentBlock]
 				del self.results[self.currentBlock]
 				self.currentBlock += 1
 				if ((self.currentBlock - blocksList[0]) % self.countPerJob == 0):
-					eta.workFinished(self.countPerJob)
+					reported = eta.workFinished(self.countPerJob)
+					if reported:
+						print "alive downloaders: %s / %s" % (len(self.downloaders) - self.deadDownloadersCount, len(self.downloaders))
 					eta.workStarted()
 			time.sleep(1)
 
+		self.working = False
 		for thread in self.threads:
 			thread.join()
 
 	def downloaderThread(self, downloader):
-		while True:
+		while self.working:
 			batch = None
-			self.lock.acquire()
-			if len(self.jobs) > 0:
-				batch = self.jobs.popleft()
-			self.lock.release()
+			with self.jobsLock:
+				if len(self.jobs) > 0:
+					batch = self.jobs.popleft()
 
 			if batch is not None:
 				n = 0
-				for block in downloader.loadBlocks(batch):
-					assert(batch[n] == block['height'])
-					self.results[batch[n]] = block
-					n += 1
+				try:
+					for block in downloader.loadBlocks(batch):
+						assert(batch[n] == block['height'])
+						self.results[batch[n]] = block
+						n += 1
+				except:
+					with self.jobsLock:
+						self.jobs.appendleft(batch[n:])
+					with self.deadDownloadersCountLock:
+						self.deadDownloadersCount += 1
+					raise
 			else:
-				break
+				time.sleep(0.1)
+

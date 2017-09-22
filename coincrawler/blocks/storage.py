@@ -10,11 +10,11 @@ BLOCK_TABLE_COLUMNS = {
 
 class IStorage(object):
 
+	def getBlockHeight(self):
+		return 0
+
 	def storeBlock(self, block):
 		return
-
-	def getBlocks(self):
-		return set()
 
 
 class PostgresDBStorage(IStorage):
@@ -30,9 +30,6 @@ class PostgresDBStorage(IStorage):
 		columnsText = ", ".join([column + " " + BLOCK_TABLE_COLUMNS[column] for column in self.columns])
 		self.db.queryNoReturnCommit("CREATE TABLE IF NOT EXISTS %s (%s)" % (self.tableName, columnsText))
 
-	def getBlocks(self):
-		return set([height[0] for height in self.db.queryReturnAll("SELECT height FROM %s" % self.tableName)])
-
 	def getBlockHeight(self):
 		result = self.db.queryReturnAll("SELECT height FROM %s ORDER BY height DESC LIMIT 1" % self.tableName)
 		if len(result) > 0:
@@ -47,6 +44,10 @@ class PostgresDBStorage(IStorage):
 		for column in self.columns:
 			blockData += (block[column],)
 		self.db.queryNoReturnCommit("INSERT INTO blocks_" + self.ticker + " (" + columnsText + ") VALUES (" + valuesText + ")", blockData)
+		
+
+
+
 
 		
 

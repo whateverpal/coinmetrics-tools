@@ -2,9 +2,9 @@ import requests
 import time
 import json
 
-class JobClient(object):
+class NetworkClient(object):
 
-	def __init__(self, host, port, maxRetries=18, maxTimeout=12):
+	def __init__(self, host, port, maxRetries=12, maxTimeout=10):
 		self.host = host
 		self.port = port
 		self.maxRetries = maxRetries
@@ -19,13 +19,13 @@ class JobClient(object):
 			except (requests.exceptions.ConnectionError, requests.exceptions.ReadTimeout) as e:
 				if retries < self.maxRetries:
 					retries += 1
-					print "failed to issue command due to connection error"
+					print "failed to issue command due to connection error or timeout, resending request"
 					print e
 					time.sleep(10)
 					continue
 				else:
 					print "too much retries, bailing out"
-					raise e
+					return None, "failed to issue command due to connection error or timeout"
 
 			if result.status_code != 200:
 				return None, result.text
@@ -37,7 +37,7 @@ class JobClient(object):
 						result = result.json()
 						return result, None
 					except ValueError:
-						print "json object cannot be decoded"
+						print "json object cannot be decoded, resending request"
 						if retries < self.maxRetries:
 							result = None
 							retries += 1

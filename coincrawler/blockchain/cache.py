@@ -43,3 +43,12 @@ class LMDBCache(object):
 			return None
 		else:
 			return json.loads(lmdbResult)
+
+
+class ZeroCache(object):
+
+	def put(self, key, value):
+		return
+
+	def get(self, key):
+		return None

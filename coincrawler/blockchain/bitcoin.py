@@ -8,13 +8,14 @@ from coincrawler.utils import bech32
 
 class BitcoinAccess(JsonRpcCaller):
 
-	def __init__(self, host, port, user, password, useLMDBCache=False, lmdbCachePath="", isPivx=False):
+	def __init__(self, host, port, user, password, useLMDBCache=False, lmdbCachePath="", isPivx=False, maxPrefetchInputs=5000):
 		super(BitcoinAccess, self).__init__(host, port, user, password)
 		if useLMDBCache:
 			self.cache = LMDBCache(lmdbCachePath)
 		else:
-			self.cache = DictFIFOCache()
+			self.cache = ZeroCache()
 		self.isPivx = isPivx
+		self.maxPrefetchInputs = maxPrefetchInputs
 
 	def getBlockCount(self):
 		return self.call("getblockcount")
@@ -35,6 +36,7 @@ class BitcoinAccess(JsonRpcCaller):
 	def getRawTransactionsEfficiently(self, txidList):
 		result = []
 		notInCache = {}
+		justArrived = {}
 		numCached = 0
 		numDuplicates = 0
 		requestSet = set()
@@ -43,10 +45,11 @@ class BitcoinAccess(JsonRpcCaller):
 				numDuplicates += 1
 			requestSet.add(txid)
 
-			cachedResult = self.cache.get(txid)
+			cachedResult = justArrived[txid] if txid in justArrived else self.cache.get(txid)
 			if cachedResult is not None:
 				numCached += 1
 				result.append(cachedResult)
+				justArrived[txid] = cachedResult
 			else:
 				result.append(None)
 				if not txid in notInCache:
@@ -84,8 +87,6 @@ class BitcoinAccess(JsonRpcCaller):
 					del vout['scriptPubKey']['asm']
 				if 'hex' in vout['scriptPubKey']:
 					del vout['scriptPubKey']['hex']
-				if 'type' in vout['scriptPubKey']:
-					del vout['scriptPubKey']['type']
 				if 'reqSigs' in vout['scriptPubKey']:
 					del vout['scriptPubKey']['reqSigs']
 				if 'n' in vout['scriptPubKey']:
@@ -104,26 +105,36 @@ class BitcoinAccess(JsonRpcCaller):
 		return result
 
 	def getTxInputOutputInfo(self, txInfo):
-		outputInfo = {}
+		outputInfo = {frozenset(["nonstandard"]): 0.0}
 		outputs = txInfo['vout']
 		for output in outputs:
-			if 'addresses' in output['scriptPubKey']:
+			outputType = output['scriptPubKey']['type']
+			if outputType != 'nonstandard' and outputType != 'nulldata':
+				assert('addresses' in output['scriptPubKey'])
+				assert(len(output['scriptPubKey']['addresses']) > 0)
 				key = frozenset(output['scriptPubKey']['addresses'])
-				if not key in outputInfo:
-					outputInfo[key] = 0
-				outputInfo[key] += output['value']
+			else:
+				key = frozenset(["nonstandard"])
+			if not key in outputInfo:
+				outputInfo[key] = 0.0
+			outputInfo[key] += output['value']
 		
-		inputInfo = {}
+		inputInfo = {frozenset(["nonstandard"]): 0.0}
 		inputs = txInfo['vin']
 		inputBulkData = self.getRawTransactionsEfficiently([inputTx['txid'] for inputTx in inputs])
-
 		for i in xrange(len(inputs)):
 			inputTx = inputs[i]
 			inputTxInfo = inputBulkData[i]
 			usedOutput = inputTxInfo['vout'][inputTx['vout']]
-			key = frozenset(usedOutput['scriptPubKey']['addresses'])
+			outputType = usedOutput['scriptPubKey']['type']
+			if outputType != 'nonstandard' and outputType != 'nulldata':
+				assert('addresses' in usedOutput['scriptPubKey'])
+				assert(len(usedOutput['scriptPubKey']['addresses']) > 0)
+				key = frozenset(usedOutput['scriptPubKey']['addresses'])
+			else:
+				key = frozenset(["nonstandard"])
 			if not key in inputInfo:
-				inputInfo[key] = 0
+				inputInfo[key] = 0.0
 			inputInfo[key] += usedOutput['value']
 
 		return (inputInfo, outputInfo)
@@ -206,7 +217,7 @@ class BitcoinAccess(JsonRpcCaller):
 					inputTxsSet.add(inputTx['txid'])
 		inputTxs = list(inputTxsSet)
 
-		if len(inputTxs) < 5000:
+		if len(inputTxs) < self.maxPrefetchInputs:
 			self.getRawTransactionsEfficiently(inputTxs)
 		else:
 			print "Too big prefetch input set: %d inputs" % len(inputTxs)

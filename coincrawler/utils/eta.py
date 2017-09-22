@@ -44,6 +44,9 @@ class BlockCollectionETA(object):
 
 		if self.workSteps % self.outputInterval == 0:
 			self.output()
+			return True
+		else:
+			return False
 
 	def getETA(self):
 		return (self.totalWorkAmount - self.workDone) * self.history.getAverage()

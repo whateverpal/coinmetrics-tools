@@ -69,7 +69,7 @@ class CryptoidDataSource(IDataSource):
 class NemNinjaDataSource(IDataSource):
 
 	def getBlockHeight(self):
-		return int(json.loads(requests.get("http://chain.nem.ninja/api3/blocks").text)[0]["height"]) - 10
+		return int(json.loads(requests.get("http://chain.nem.ninja/api3/blocks").text)[0]["height"]) - 40
 
 	def getBlock(self, height):
 		blockData = json.loads(requests.get("http://chain.nem.ninja/api3/block?height=%s" % height).text)
@@ -91,7 +91,7 @@ class MainnetDecredOrgDataSource(IDataSource):
 
 	def getBlockHeight(self):
 		r =	requests.get("https://mainnet.decred.org/api/status?q=getInfo")
-		return r.json()["info"]["blocks"] - 10
+		return r.json()["info"]["blocks"] - 20
 
 	def getBlock(self, height):
 		r = requests.get("https://mainnet.decred.org/api/block-index/%s" % height)
@@ -148,11 +148,11 @@ class MainnetDecredOrgDataSource(IDataSource):
 
 class BitcoinBlockchainDataSource(IDataSource):
 
-	def __init__(self, host, port, user, password, prefetchCount, useLMDBCache=False, lmdbCachePath="", isPivx=False):
+	def __init__(self, host, port, user, password, prefetchCount, useLMDBCache=False, lmdbCachePath="", isPivx=False, maxPrefetchInputs=5000, dropBlocksCount=10):
 		self.prefetchCount = prefetchCount
-		self.blockchainAccess = BitcoinAccess(host, port, user, password, useLMDBCache, lmdbCachePath, isPivx)
+		self.blockchainAccess = BitcoinAccess(host, port, user, password, useLMDBCache, lmdbCachePath, isPivx, maxPrefetchInputs)
 		self.steps = 0
-		self.networkBlocksCount = self.blockchainAccess.getBlockCount() - 10
+		self.networkBlocksCount = self.blockchainAccess.getBlockCount() - dropBlocksCount
 
 	def getBlockHeight(self):
 		return self.networkBlocksCount
@@ -220,8 +220,8 @@ class EthereumBlockchainDataSource(IDataSource):
 class EtherChainDataSource(IDataSource):
 
 	def getBlockHeight(self):
-		r = requests.get("https://etherchain.org/api/blocks/count")
-		return r.json()["data"][0]["count"] - 10
+		r = requests.get("https://etherchain.org/api/blocks/count", timeout=10)
+		return r.json()["data"][0]["count"] - 100
 
 	def getBlock(self, height):
 		r = requests.get("https://etherchain.org/api/block/%s" % height, timeout=10)
@@ -264,3 +264,25 @@ class MoneroBlockchainDataSource(IDataSource):
 		fees = coinbase['fee_amount'] / 1000000000000.0
 		generatedCoins = coinbase['emission_amount'] / 1000000000000.0
 		return {"height": height, "timestamp": timestamp, "difficulty": difficulty, "generatedCoins": generatedCoins, "fees": fees, "txCount": txCount, "txVolume": 0.0}
+
+
+class MoneroExplorerDataSource(IDataSource):
+
+	def getBlockHeight(self):
+		r = requests.get("https://moneroexplorer.com", timeout=10)
+		soup = BeautifulSoup(r.text, 'html.parser')
+		return int(soup.find_all(class_="primary table")[1].find("a").text) - 50
+
+	def getBlock(self, height):
+		r = requests.get("https://moneroexplorer.com/block/%s" % height, timeout=10)
+		soup = BeautifulSoup(r.text, 'html.parser')
+		txCount = int(soup.find_all("h3")[1].text.split("(")[1].split(")")[0])
+
+		timestamp = dateutilParser.parse(soup.find(class_="primary table").find_all("td")[0].text.split("):")[1].split("(")[0])
+		generatedCoins = float(soup.find(class_="primary table").find_all("tr")[1].find_all("td")[1].text.split(":")[1])
+		if txCount == 0:
+			fees = 0.0
+		else:
+			fees = float(soup.find(class_="primary table").find_all("tr")[2].find_all("td")[1].text.split(":")[1])
+
+		return {"height": height, "timestamp": timestamp, "difficulty": 0, "generatedCoins": generatedCoins, "fees": fees, "txCount": txCount, "txVolume": 0.0}
