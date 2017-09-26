@@ -69,69 +69,73 @@ class CryptoidDataSource(IDataSource):
 class NemNinjaDataSource(IDataSource):
 
 	def getBlockHeight(self):
-		return int(json.loads(requests.get("http://chain.nem.ninja/api3/blocks").text)[0]["height"]) - 40
+		return int(json.loads(requests.get("http://chain.nem.ninja/api3/blocks", timeout=10).text)[0]["height"]) - 40
 
 	def getBlock(self, height):
-		blockData = json.loads(requests.get("http://chain.nem.ninja/api3/block?height=%s" % height).text)
+		blockData = json.loads(requests.get("http://chain.nem.ninja/api3/block?height=%s" % height, timeout=10).text)
 		blockTimestamp = dateutilParser.parse(blockData["timestamp"])
 		txCount = blockData["tx_count"]
 
-		txVolume = 0
-		try:
-			txData = json.loads(requests.get("http://chain.nem.ninja/api3/block_transactions?height=%s" % height).text)
-			for transfer in txData["transfers"]:
-				txVolume += transfer["amount"] / 1000000
-		except ValueError:
-			pass
+		txVolume = 0.0
+		fees = 0.0
+		txData = json.loads(requests.get("http://chain.nem.ninja/api3/block_transactions?height=%s" % height, timeout=10).text)
+		for transfer in txData["transfers"]:
+			txVolume += float(transfer["amount"]) / 1000000.0
+			fees += float(transfer["fee"]) / 1000000.0
 
-		return {"height": height, "timestamp": blockTimestamp, "txVolume": txVolume, "txCount": txCount, "fees": 0.0}
+		return {"height": height, "timestamp": blockTimestamp, "txVolume": txVolume, "txCount": txCount, "fees": fees}
 
 
 class MainnetDecredOrgDataSource(IDataSource):
 
 	def getBlockHeight(self):
-		r =	requests.get("https://mainnet.decred.org/api/status?q=getInfo")
+		r =	requests.get("https://mainnet.decred.org/api/status?q=getInfo", timeout=10)
 		return r.json()["info"]["blocks"] - 20
 
 	def getBlock(self, height):
-		r = requests.get("https://mainnet.decred.org/api/block-index/%s" % height)
+		r = requests.get("https://mainnet.decred.org/api/block-index/%s" % height, timeout=10)
 		blockHash = r.json()["blockHash"]
 		
-		r = requests.get("https://mainnet.decred.org/api/block/%s" % blockHash)
+		r = requests.get("https://mainnet.decred.org/api/block/%s" % blockHash, timeout=10)
 		data = r.json()
 		
 		blockTimestamp = dateutilParser.parse(data['unixtime'])
 		generatedCoins = data['reward']
 		
 		txCount = len(data['tx']) - 1
-		txVolume = 0
+		txVolume = 0.0
+		fees = 0.0
 		for txid in data['tx']:
-			r = requests.get("https://mainnet.decred.org/api/tx/%s" % txid)
+			r = requests.get("https://mainnet.decred.org/api/tx/%s" % txid, timeout=10)
 			if r.status_code == 404:
 				print "404 CODE FOR TX %s" % txid
 				continue
 			txData = r.json()
 			outputs = {}
 			inputs = {}
+			sumOutputs = 0.0
+			sumInputs = 0.0
 
 			isCoinbase = False
 			for inputData in txData['vin']:
 				if 'coinbase' in inputData:
 					isCoinbase = True
 				else:
-					r = requests.get("https://mainnet.decred.org/api/tx/%s" % inputData['txid'])
+					r = requests.get("https://mainnet.decred.org/api/tx/%s" % inputData['txid'], timeout=10)
 					key = frozenset(r.json()['vout'][inputData['vout']]['scriptPubKey']['addresses'])
 					if not key in inputs:
 						inputs[key] = 0
 					inputs[key] += inputData['amountin']
+					sumInputs += inputData['amountin']
 			if isCoinbase:
 				continue
 
 			for outputData in txData['vout']:
+				sumOutputs += float(outputData['value'])
 				if 'addresses' in outputData['scriptPubKey']:
 					key = frozenset(outputData['scriptPubKey']['addresses'])
 					if not key in outputs:
-						outputs[key] = 0
+						outputs[key] = 0.0
 					outputs[key] += float(outputData['value'])
 
 			for adrs in outputs.keys():
@@ -143,7 +147,12 @@ class MainnetDecredOrgDataSource(IDataSource):
 				if not inInputs:
 					txVolume += outputs[adrs]
 
-		return {"height": height, "timestamp": blockTimestamp, "generatedCoins": generatedCoins, "txCount": txCount, "txVolume": txVolume, "fees": 0.0, "difficulty": 0.0}
+			if sumInputs + 0.00000000001 < sumOutputs:
+				print sumInputs, sumOutputs
+				assert(False)
+			fees += max(0.0, sumInputs - sumOutputs)
+
+		return {"height": height, "timestamp": blockTimestamp, "generatedCoins": generatedCoins, "txCount": txCount, "txVolume": txVolume, "fees": fees, "difficulty": 0.0}
 
 
 class BitcoinBlockchainDataSource(IDataSource):

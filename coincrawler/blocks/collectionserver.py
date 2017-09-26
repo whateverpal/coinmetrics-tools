@@ -2,6 +2,7 @@ import threading
 import json
 import requests
 import time
+import traceback
 from datetime import datetime
 from coincrawler.blocks.downloaders import SerialDownloader
 from coincrawler.network.server import NetworkServer
@@ -19,6 +20,8 @@ class BlockCollectionJobExecutor(object):
 		self.jobCounter = 0
 		self.jobs = {}
 		self.jobsLastAccess = {}
+		self.jobsLock = threading.Lock()
+
 		self.commandsRegistry = {
 			"startJob": self.startBlockCollectionJobCommand,
 			"getNetworkBlockHeight": self.getNetworkBlockHeightCommand,
@@ -46,18 +49,23 @@ class BlockCollectionJobExecutor(object):
 		while not self.stopping:
 			now = datetime.now()
 			toRemove = []
-			for key, value in self.jobsLastAccess.iteritems():
-				print "gc thread: testing job %d, last access %d second(s) ago" % (key, (now - value).total_seconds())
-				if (now - value).total_seconds() > 30 * 60:
-					toRemove.append(key)
+			with self.jobsLock:
+				for key, value in self.jobsLastAccess.iteritems():
+					print "gc thread: testing job %d, last access %d second(s) ago" % (key, (now - value).total_seconds())
+					if (now - value).total_seconds() > 30 * 60:
+						toRemove.append(key)
 
-			for jobId in toRemove:
-				print "gc thread: emoving job %d due to timeout" % jobId
-				self.removeJob(jobId)
+				for jobId in toRemove:
+					print "gc thread: removing job %d due to timeout" % jobId
+					self.removeJobNoLock(jobId)
 
 			time.sleep(20)
 
 	def removeJob(self, jobId):
+		with self.jobsLock:
+			self.removeJobNoLock(jobId)
+
+	def removeJobNoLock(self, jobId):
 		if jobId in self.jobs:
 			print "removing job %d" % jobId
 			self.jobs[jobId].stop()
@@ -78,49 +86,54 @@ class BlockCollectionJobExecutor(object):
 		if fromHeight < 1 or toHeight < 1 or toHeight < fromHeight:
 			return None, "Bad params"
 
-		self.jobCounter += 1
-		sleepBetweenRequests = 0
-		if currency in self.dataSourcesSleepBetweenRequests:
-			sleepBetweenRequests = self.dataSourcesSleepBetweenRequests[currency]
-		self.jobs[self.jobCounter] = BlockCollectionJob(self.dataSources[currency], sleepBetweenRequests, fromHeight, toHeight)
-		self.jobs[self.jobCounter].start()
-		self.jobsLastAccess[self.jobCounter] = datetime.now()
+		with self.jobsLock:
+			self.jobCounter += 1
+			sleepBetweenRequests = 0
+			if currency in self.dataSourcesSleepBetweenRequests:
+				sleepBetweenRequests = self.dataSourcesSleepBetweenRequests[currency]
+			self.jobs[self.jobCounter] = BlockCollectionJob(self.dataSources[currency], sleepBetweenRequests, fromHeight, toHeight)
+			self.jobs[self.jobCounter].start()
+			self.jobsLastAccess[self.jobCounter] = datetime.now()
 		return self.jobCounter, None
 
 	def stopJobCommand(self, jobId=0, *args):
-		jobId = int(jobId)
-		if not jobId in self.jobs:
-			return None, "No job with provided id"
-		self.removeJob(jobId)
+		with self.jobsLock:
+			jobId = int(jobId)
+			if not jobId in self.jobs:
+				return None, "No job with provided id"
+			self.removeJobNoLock(jobId)
 		return True, None
 
 	def stopAllJobsCommand(self, *args):
-		for job in self.jobs.values():
-			job.prepareToStop()
-		for jobId in self.jobs.keys():
-			self.removeJob(jobId)
-		self.jobs = {}
+		with self.jobsLock:
+			for job in self.jobs.values():
+				job.stop()
+			for jobId in self.jobs.keys():
+				self.removeJobNoLock(jobId)
+			self.jobs = {}
 		return True, None
 
 	def getJobStatusCommand(self, jobId=0, *args):
-		jobId = int(jobId)
-		if not jobId in self.jobs:
-			return None, "No job with provided id"
+		with self.jobsLock:
+			jobId = int(jobId)
+			if not jobId in self.jobs:
+				return None, "No job with provided id"
+			job = self.jobs[jobId]
+			self.jobsLastAccess[jobId] = datetime.now()
 
-		job = self.jobs[jobId]
-		self.jobsLastAccess[jobId] = datetime.now()
 		result = {"progress": job.getProgress(), "failed": job.getFailed()}
 		if job.getFailed():
 			result["failure_message"] = job.getFailureMessage()
 		return result, None
 
 	def getJobResultCommand(self, jobId=0, fromHeight=0, toHeight=0, *args):
-		jobId = int(jobId)
-		if not jobId in self.jobs:
-			return None, "No job with provided id"
+		with self.jobsLock:
+			jobId = int(jobId)
+			if not jobId in self.jobs:
+				return None, "No job with provided id"
+			job = self.jobs[jobId]
+			self.jobsLastAccess[jobId] = datetime.now()
 
-		job = self.jobs[jobId]
-		self.jobsLastAccess[jobId] = datetime.now()
 		if job.getFailed():
 			return None, "Job failed %s: %s" % (jobId, job.getFailureMessage())
 
@@ -161,12 +174,8 @@ class BlockCollectionJob(object):
 		self.thread = threading.Thread(None, self.threadFunc, "", ())
 		self.thread.start()
 
-	def prepareToStop(self):
-		self.stopping = True
-
 	def stop(self):
 		self.stopping = True
-		self.thread.join()
 
 	def threadFunc(self):
 		try:
@@ -184,7 +193,7 @@ class BlockCollectionJob(object):
 		except Exception as e:
 			print e
 			print "job failed!"
-			self.setFailed(str(e))
+			self.setFailed(traceback.format_exc())
 			raise e
 
 	def getFailed(self):
