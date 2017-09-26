@@ -16,8 +16,11 @@ Python modules: psycopg2, bs4, python-dateutil, lmdb, requests.
 Coincrawler supports Bitcoin, Litecoin, Dash, PIVX, Monero, Dogecoin, Decred, XEM, Ethereum, Ethereum Classic, ZCash and, probably, many other currencies based on Bitcoin code.
 
 Bitcoin, Litecoin, Dash, Dogecoin, PIVX, ZCash data is fetched from blockchains via RPC API.
+
 Decred and XEM data is fetched from block explorers https://mainnet.decred.org and http://chain.nem.ninja respectively.
+
 Ethereum data can be fetched either from blockchain or https://etherchain.org. 
+
 Monero data can be fetched either from blockchain or https://moneroexplorer.com.
 
 ### How to use
