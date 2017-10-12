@@ -11,7 +11,21 @@ from coincrawler.network.server import NetworkServer
 class BlockCollectionServer(NetworkServer):
 
 	def __init__(self, port, dataSources, dataSourcesSleepBetweenRequests):
-		super(BlockCollectionServer, self).__init__(port, BlockCollectionJobExecutor(dataSources, dataSourcesSleepBetweenRequests))
+		executor = BlockCollectionJobExecutor(dataSources, dataSourcesSleepBetweenRequests)
+		inputExecutor = BlockCollectionInputExecutor(executor)
+		super(BlockCollectionServer, self).__init__(port, executor, inputExecutor)
+
+
+class BlockCollectionInputExecutor(object):
+
+	def __init__(self, jobsExecutor):
+		self.jobsExecutor = jobsExecutor 
+
+	def processInput(self, userInput):
+		if userInput == "stats":
+			self.jobsExecutor.printStats()
+		else:
+			print "unrecognized input"
 
 
 class BlockCollectionJobExecutor(object):
@@ -52,7 +66,7 @@ class BlockCollectionJobExecutor(object):
 			with self.jobsLock:
 				for key, value in self.jobsLastAccess.iteritems():
 					print "gc thread: testing job %d, last access %d second(s) ago" % (key, (now - value).total_seconds())
-					if (now - value).total_seconds() > 30 * 60:
+					if (now - value).total_seconds() > 15 * 60:
 						toRemove.append(key)
 
 				for jobId in toRemove:
@@ -155,6 +169,10 @@ class BlockCollectionJobExecutor(object):
 
 	def getPingCommand(self):
 		return {}, None
+
+	def printStats(self):
+		print "current job count: %d" % len(self.jobs)
+		print "job counter: %d" % self.jobCounter
 
 
 class BlockCollectionJob(object):

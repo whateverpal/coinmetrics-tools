@@ -2,29 +2,39 @@ from datetime import timedelta, datetime
 import json
 
 def dumpDailyStatsToCSV(currency, db):
-	blocksTableName = "blocks_" + currency
-	blocks = db.queryReturnAll("SELECT timestamp, txVolume, txCount, generatedCoins, fees FROM " + blocksTableName)
-	pricesTableName = "priceUsd_" + currency
-	prices = db.queryReturnAll("SELECT timestamp, price, marketCap, totalExchangeVolume FROM " + pricesTableName)
-
+	print "%s dump started" % currency
+	allData = []
 	txVolumeByDay = {}
 	txCountByDay = {}
 	generatedCoinsByDay = {}
 	feesByDay = {}
-	for block in blocks:
-		blockTimestamp = block[0].replace(second=0, microsecond=0, hour=0, minute=0) + timedelta(days=1)
-		intTimestamp = int((blockTimestamp - datetime(1970, 1, 1)).total_seconds())
-		if not intTimestamp in txVolumeByDay:
-			txVolumeByDay[intTimestamp] = 0.0
-			txCountByDay[intTimestamp] = 0
-			generatedCoinsByDay[intTimestamp] = 0.0
-			feesByDay[intTimestamp] = 0.0
-		txVolumeByDay[intTimestamp] += float(block[1])
-		txCountByDay[intTimestamp] += float(block[2])
-		generatedCoinsByDay[intTimestamp] += 0.0 if block[3] is None else float(block[3])
-		feesByDay[intTimestamp] += 0.0 if block[4] is None else float(block[4])
 
-	allData = []
+	blocksTableName = "blocks_" + currency
+	blocksCount = db.queryReturnOne("SELECT COUNT(*) FROM " + blocksTableName)[0]
+	print "total blocks: %d" % blocksCount
+	batchSize = 1000000
+	batchCount = blocksCount / batchSize + 1 if blocksCount % batchSize != 0 else blocksCount / batchSize
+	for i in xrange(batchCount):
+		offset = i * batchSize
+		print "fetching %d blocks starting from %d" % (batchSize, offset)
+		blocks = db.queryReturnAll("SELECT timestamp, txVolume, txCount, generatedCoins, fees FROM " + blocksTableName + " ORDER BY HEIGHT ASC LIMIT %s OFFSET %s", 
+			(batchSize, offset))
+		print "fetched %d blocks" % len(blocks)
+		for block in blocks:
+			blockTimestamp = block[0].replace(second=0, microsecond=0, hour=0, minute=0) + timedelta(days=1)
+			intTimestamp = int((blockTimestamp - datetime(1970, 1, 1)).total_seconds())
+			if not intTimestamp in txVolumeByDay:
+				txVolumeByDay[intTimestamp] = 0.0
+				txCountByDay[intTimestamp] = 0
+				generatedCoinsByDay[intTimestamp] = 0.0
+				feesByDay[intTimestamp] = 0.0
+			txVolumeByDay[intTimestamp] += float(block[1])
+			txCountByDay[intTimestamp] += float(block[2])
+			generatedCoinsByDay[intTimestamp] += 0.0 if block[3] is None else float(block[3])
+			feesByDay[intTimestamp] += 0.0 if block[4] is None else float(block[4])
+
+	pricesTableName = "priceUsd_" + currency
+	prices = db.queryReturnAll("SELECT timestamp, price, marketCap, totalExchangeVolume FROM " + pricesTableName)
 	for date, price, marketcap, exchangeVolume in prices:
 		row = [date]
 		intTimestamp = int((date - datetime(1970, 1, 1)).total_seconds())
@@ -32,7 +42,7 @@ def dumpDailyStatsToCSV(currency, db):
 			row.append(str(txVolumeByDay[intTimestamp] * float(price)))
 			row.append(str(txCountByDay[intTimestamp]))
 			row.append(str(generatedCoinsByDay[intTimestamp]))
-			row.append(str(feesByDay[intTimestamp]) if currency in ["doge", "zec", "xmr", "etc", "eth", "pivx"] else "null")
+			row.append(str(feesByDay[intTimestamp]))
 			row.append(str(float(price)))
 			row.append(str(float(marketcap)))
 			row.append(str(float(exchangeVolume)))

@@ -16,55 +16,6 @@ class IDataSource(object):
 	def getBlock(self, height):
 		return None
 
-	def getBlocks(self, heights):
-		return None
-
-
-class CryptoidDataSource(IDataSource):
-
-	def __init__(self, ticker):
-		self.ticker = ticker
-
-	def getBlockHeight(self):
-		r = requests.get("https://chainz.cryptoid.info/explorer/index.data.dws?coin=%s&n=1" % self.ticker, timeout=10)
-		return int(json.loads(r.text)["blocks"][0]["height"]) - 10
-
-	def getBlock(self, height):
-		r = None
-		retries = 0
-		while r is None:
-			try:
-				r = requests.get("https://chainz.cryptoid.info/dash/block.dws?%s.htm" % height, timeout=10)
-			except requests.exceptions.ReadTimeout as e:
-				if retries > 3:
-					raise e
-				else:
-					print "read timeout, retrying"
-					retries += 1
-		soup = BeautifulSoup(r.text, 'html.parser')
-		td = soup.find("table", id="details").find_all("td")[0]
-		trs = td.find_all("tr")
-		
-		dateText = trs[0].find("td").find("td").text
-		m = re.search('[0-9][0-9][0-9][0-9]\-[0-9][0-9]\-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]', dateText)
-		date = m.group(0)
-		blockTimestamp = dateutilParser.parse(date)
-
-		txCount = int(trs[0].find(text="Transactions").next_sibling.children.next()) - 1
-
-		amount = trs[0].find(text="Value Out")
-		valueOut = float(str(amount.next_sibling.children.next()).replace(",", "")) + float(amount.next_sibling.find("small").text)
-		
-		generated = trs[0].find(text="Created")
-		generatedCoins = 0
-		try:
-			generatedCoins = float(str(generated.parent.next_sibling.children.next()).replace(",", "")) + float(generated.parent.next_sibling.find("small").text)
-		except AttributeError:
-			pass
-		txVolume = max(0.0, valueOut - generatedCoins)
-
-		return {"height": height, "timestamp": blockTimestamp, "txVolume": txVolume, "txCount": txCount, "generatedCoins": generatedCoins, "fees": 0.0, "difficulty": 0.0}
-
 
 class NemNinjaDataSource(IDataSource):
 
@@ -78,10 +29,14 @@ class NemNinjaDataSource(IDataSource):
 
 		txVolume = 0.0
 		fees = 0.0
-		txData = json.loads(requests.get("http://chain.nem.ninja/api3/block_transactions?height=%s" % height, timeout=10).text)
-		for transfer in txData["transfers"]:
-			txVolume += float(transfer["amount"]) / 1000000.0
-			fees += float(transfer["fee"]) / 1000000.0
+		response = requests.get("http://chain.nem.ninja/api3/block_transactions?height=%s" % height, timeout=10)
+		if response.status_code != 500:
+			txData = json.loads(response.text)
+			for transfer in txData["transfers"]:
+				txVolume += float(transfer["amount"]) / 1000000.0
+				fees += float(transfer["fee"]) / 1000000.0
+		else:
+			print "NemNinja get_transactions API failed on block %d" % height
 
 		return {"height": height, "timestamp": blockTimestamp, "txVolume": txVolume, "txCount": txCount, "fees": fees}
 
@@ -295,3 +250,5 @@ class MoneroExplorerDataSource(IDataSource):
 			fees = float(soup.find(class_="primary table").find_all("tr")[2].find_all("td")[1].text.split(":")[1])
 
 		return {"height": height, "timestamp": timestamp, "difficulty": 0, "generatedCoins": generatedCoins, "fees": fees, "txCount": txCount, "txVolume": 0.0}
+
+

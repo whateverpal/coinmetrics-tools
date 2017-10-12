@@ -8,6 +8,7 @@ dataSources = {
 	# bitcoin-like cryptocurrencies' data can be fetched from node via RPC API
 	# pass address, port, user, password, number of blocks to prefetch (recommended 1 for big blockchains and 5-10 for small) and path to the folder which will contain LMDB cache
 	"btc": 	lambda: BitcoinBlockchainDataSource("localhost", 35753, "rpcuser", "rpcpassword", 1, useLMDBCache=True, lmdbCachePath="/path/to/btc/cache"),
+	"bch": 	lambda: BitcoinBlockchainDataSource("localhost", 35853, "rpcuser", "rpcpassword", 1, useLMDBCache=True, lmdbCachePath="/path/to/bch/cache"),
 	"dash": lambda: BitcoinBlockchainDataSource("localhost", 20004, "rpcuser", "rpcpassword", 10, useLMDBCache=True, lmdbCachePath="/path/to/dash/cache"),
 	"zec": 	lambda: BitcoinBlockchainDataSource("localhost", 13333, "rpcuser", "rpcpassword", 5, useLMDBCache=True, lmdbCachePath="/path/to/zcash/cache"),
 	"doge": lambda: BitcoinBlockchainDataSource("localhost", 19999, "rpcuser", "rpcpassword", 10, useLMDBCache=True, lmdbCachePath="/path/to/doge/cache"),
@@ -33,4 +34,4 @@ dataSourcesSleepBetweenRequests = {
 }
 
 # run block collection server on port 13333 until keyboard interrupt is received
-BlockCollectionServer(13333, dataSources, dataSourcesSleepBetweenRequests).runEndlessly()
+BlockCollectionServer(13333, dataSources, dataSourcesSleepBetweenRequests).run()

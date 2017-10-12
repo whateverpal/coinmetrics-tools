@@ -4,6 +4,7 @@ import json
 import urllib
 import time
 import os
+import traceback
 
 class ThreadedHTTPServer(BaseHTTPServer.HTTPServer):
 
@@ -23,19 +24,36 @@ class NetworkServer(object):
 		def do_GET(self):
 			self.server.owner.processRequest(self)
 
-	def __init__(self, port, executor):
+	def __init__(self, port, executor, inputExecutor=None):
 		self.port = port
 		self.server = ThreadedHTTPServer(("0.0.0.0", port), NetworkServer.Handler)
 		self.server.owner = self
 		self.executor = executor
+		self.inputExecutor = inputExecutor
 
-	def runEndlessly(self):
+	def runWithInput(self):
 		self.start()
-		while True:
+		try:
+			while True:
+				userInput = raw_input("")
+				if self.inputExecutor is not None:
+					self.inputExecutor.processInput(userInput)
+				else:
+					print "this server doesn't handle input"
+		except:
 			try:
-				time.sleep(1)
+				print "Received exception: ", traceback.format_exc()
 			except KeyboardInterrupt:
-				os._exit(1)
+				print "keyboard interrupt"
+			os._exit(1)
+
+	def run(self):
+		self.start()
+		try:
+			while True:
+				time.sleep(0.1)
+		except KeyboardInterrupt:
+			os._exit(1)
 
 	def start(self):
 		self.thread = threading.Thread(None, self.threadFunc, "", ())
