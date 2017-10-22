@@ -8,7 +8,7 @@ import os
 mineableCurrencyColumns = ["height", "timestamp", "txVolume", "txCount", "generatedCoins", "fees", "difficulty"]
 nonmineableCurrencyColumns = ["height", "timestamp", "txVolume", "txCount", "fees"]
 
-def fetchBlocksFromServers(currency, hostsAndPorts, sleepBetweenRequests, countPerJob, db):
+def fetchBlocksFromServers(currency, hostsAndPorts, sleepBetweenRequests, countPerJob, db, stopSignal=None):
 	columns = nonmineableCurrencyColumns if currency == "xem" else mineableCurrencyColumns
 	storage = PostgresDBStorage(currency, columns, db)
 	downloaders = []
@@ -29,6 +29,11 @@ def fetchBlocksFromServers(currency, hostsAndPorts, sleepBetweenRequests, countP
 				if type(block["timestamp"]) != datetime:
 					block["timestamp"] = datetime.utcfromtimestamp(block["timestamp"])
 				storage.storeBlock(block)
+
+				if stopSignal is not None and stopSignal():
+					print "stop signal received, aborting"
+					return
+					
 		print "sync done"
 	except KeyboardInterrupt:
 		print "keyboard interrupt received, exiting"

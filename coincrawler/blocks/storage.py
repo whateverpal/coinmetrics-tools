@@ -44,13 +44,4 @@ class PostgresDBStorage(IStorage):
 		for column in self.columns:
 			blockData += (block[column],)
 		self.db.queryNoReturnCommit("INSERT INTO blocks_" + self.ticker + " (" + columnsText + ") VALUES (" + valuesText + ")", blockData)
-		
-
-
-
-
-		
-
-
-
 

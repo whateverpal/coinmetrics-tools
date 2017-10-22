@@ -17,11 +17,11 @@ dataSources = {
 	"pivx": lambda: BitcoinBlockchainDataSource("localhost", 20005, "rpcuser", "rpcpassword", 20, useLMDBCache=True, lmdbCachePath="/path/to/pivx/cache", isPivx=True),
 	
 	# ETC and Monero data sources rely on geth / monero RPC API
-	"etc": 	lambda: EthereumBlockchainDataSource("localhost", 8545),
+	"etc": 	lambda: EthereumClassicBlockchainDataSource("localhost", 8545),
 	"xmr": 	lambda: MoneroBlockchainDataSource("localhost", 18081),
 
 	# Ethereum data can be fetched either the same way as ETC or from etherchain.org block explorer
-	"eth": 	lambda: EtherChainDataSource(),
+	"eth": 	lambda: EtherChainDataSource(), # or lambda: EthereumBlockchainDataSource()
 
 	# XEM and DCR are fetched from block explorers
 	"xem": 	lambda: NemNinjaDataSource(),

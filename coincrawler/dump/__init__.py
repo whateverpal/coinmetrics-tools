@@ -10,8 +10,8 @@ def dumpDailyStatsToCSV(currency, db):
 	feesByDay = {}
 
 	blocksTableName = "blocks_" + currency
-	blocksCount = db.queryReturnOne("SELECT COUNT(*) FROM " + blocksTableName)[0]
-	print "total blocks: %d" % blocksCount
+	blocksCount = int(db.queryReturnOne("SELECT height FROM %s ORDER BY height DESC LIMIT 1" % blocksTableName)[0])
+	print "blocks count: %d" % blocksCount
 	batchSize = 1000000
 	batchCount = blocksCount / batchSize + 1 if blocksCount % batchSize != 0 else blocksCount / batchSize
 	for i in xrange(batchCount):

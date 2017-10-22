@@ -143,8 +143,15 @@ class EthereumBlockchainDataSource(IDataSource):
 		self.ethereumAccess = EthereumAccess(host, port)
 		self.networkBlocksCount = self.ethereumAccess.getBlockCount() - 100
 
+	def getBaseBlockReward(self, height):
+		BYZANTIUM_FORK_HEIGHT = 4370000
+		if height < BYZANTIUM_FORK_HEIGHT:
+			return 5.0
+		else:
+			return 3.0
+
 	def getBlockHeight(self):
-		return self.networkBlocksCount
+		return self.networkBlocksCount - 100
 
 	def getBlock(self, height):
 		blockInfo = self.ethereumAccess.getBlockByHeight(height)
@@ -166,19 +173,26 @@ class EthereumBlockchainDataSource(IDataSource):
 			fees += fee
 			index += 1
 
-		generatedCoins = 5.0
+		baseReward = self.getBaseBlockReward(height)
+		generatedCoins = baseReward
 		unclesCount = len(blockInfo['uncles'])
-		unclesCountReward = unclesCount * 5.0 / 32
+		unclesCountReward = unclesCount * baseReward / 32
 		generatedCoins += unclesCountReward
 		unclesReward = 0.0
 		if unclesCount > 0:
 			uncles = self.ethereumAccess.bulkCall([("eth_getUncleByBlockNumberAndIndex", [hex(height), hex(i)]) for i in xrange(unclesCount)])
 			numbers = [int(uncle['number'], base=16) for uncle in uncles]
 			for n in numbers:
-				unclesReward += 5.0 * (n + 8 - height) / 8
+				unclesReward += baseReward * (n + 8 - height) / 8
 		generatedCoins += unclesReward
 
 		return {"height": height, "timestamp": blockTimestamp, "txVolume": txVolume, "txCount": txCount, "generatedCoins": generatedCoins, "fees": fees, "difficulty": difficulty}
+
+
+class EthereumClassicBlockchainDataSource(EthereumBlockchainDataSource):
+
+	def getBaseBlockReward(self, height):
+		return 5.0
 
 
 class EtherChainDataSource(IDataSource):

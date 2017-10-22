@@ -200,7 +200,7 @@ class MultisourceDownloader(IDownloader):
 						self.results[batch[n]] = block
 						n += 1
 				except:
-					print "download has died!"
+					print "downloader died!"
 					with self.jobsLock:
 						self.jobs.appendleft(batch[n:])
 					with self.deadDownloadersCountLock:
