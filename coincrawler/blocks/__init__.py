@@ -1,16 +1,13 @@
-from coincrawler.db import DBAccess
-from storage import PostgresDBStorage
-from datasources import *
-from downloaders import *
+from downloaders import NetworkDownloader, MultisourceDownloader
 from datetime import datetime
 import os
 
 mineableCurrencyColumns = ["height", "timestamp", "txVolume", "txCount", "generatedCoins", "fees", "difficulty"]
 nonmineableCurrencyColumns = ["height", "timestamp", "txVolume", "txCount", "fees"]
 
-def fetchBlocksFromServers(currency, hostsAndPorts, sleepBetweenRequests, countPerJob, db, stopSignal=None):
+def fetchBlocksFromServers(currency, hostsAndPorts, sleepBetweenRequests, countPerJob, storage, stopSignal=None):
 	columns = nonmineableCurrencyColumns if currency == "xem" else mineableCurrencyColumns
-	storage = PostgresDBStorage(currency, columns, db)
+	blockStorageAccess = storage.getBlockStorageAccess(currency, columns)
 	downloaders = []
 	for host, port in hostsAndPorts:
 		downloader = NetworkDownloader(currency, host, port, sleepBetweenRequests=sleepBetweenRequests, amountPerRequest=countPerJob)
@@ -19,7 +16,7 @@ def fetchBlocksFromServers(currency, hostsAndPorts, sleepBetweenRequests, countP
 	
 	try:
 		networkBlockHeight = downloader.getBlockHeight()
-		dbBlockHeight = storage.getBlockHeight()
+		dbBlockHeight = blockStorageAccess.getBlockHeight()
 		print "db blocks: %s, network blocks: %s" % (dbBlockHeight, networkBlockHeight)
 
 		blocksToLoad = range(dbBlockHeight + 1, networkBlockHeight + 1)
@@ -28,11 +25,11 @@ def fetchBlocksFromServers(currency, hostsAndPorts, sleepBetweenRequests, countP
 			for block in downloader.loadBlocks(blocksToLoad):
 				if type(block["timestamp"]) != datetime:
 					block["timestamp"] = datetime.utcfromtimestamp(block["timestamp"])
-				storage.storeBlock(block)
+				blockStorageAccess.storeBlock(block)
 
 				if stopSignal is not None and stopSignal():
-					print "stop signal received, aborting"
-					return
+					print "stop signal received, syncing will be aborted"
+					downloader.stop()
 					
 		print "sync done"
 	except KeyboardInterrupt:

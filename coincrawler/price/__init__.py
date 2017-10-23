@@ -4,27 +4,24 @@ from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 from dateutil import parser as dateutilParser
 
-from coincrawler.db import DBAccess
+cmcTickerTranslation = {
+	"btc": "bitcoin", 
+	"bch": "bitcoin-cash",
+	"ltc": "litecoin", 
+	"xem": "nem", 
+	"dash": "dash", 
+	"xmr": "monero", 
+	"dcr": "decred", 
+	"eth": "ethereum", 
+	"zec": "zcash", 
+	"doge": "dogecoin", 
+	"etc": "ethereum-classic", 
+	"pivx": "pivx"
+}
 
 def downloadUsdPriceData(currency, db):
-	db.queryNoReturnCommit("CREATE TABLE IF NOT EXISTS %s (timestamp TIMESTAMP PRIMARY KEY, price NUMERIC, marketcap NUMERIC, totalExchangeVolume NUMERIC)" %
-		("priceUsd_" + currency))
-	db.queryNoReturnCommit("TRUNCATE TABLE priceUsd_" + currency)
-
-	cmcTickerTranslation = {
-		"btc": "bitcoin", 
-		"bch": "bitcoin-cash",
-		"ltc": "litecoin", 
-		"xem": "nem", 
-		"dash": "dash", 
-		"xmr": "monero", 
-		"dcr": "decred", 
-		"eth": "ethereum", 
-		"zec": "zcash", 
-		"doge": "dogecoin", 
-		"etc": "ethereum-classic", 
-		"pivx": "pivx"
-	}
+	priceStorageAccess = db.getPriceStorageAccess(currency)
+	priceStorageAccess.flushPrices()
 
 	dateNow = datetime.now()
 	year = str(dateNow.year)
@@ -40,6 +37,7 @@ def downloadUsdPriceData(currency, db):
 	soup = BeautifulSoup(r.text, 'html.parser')
 
 	rows = soup.find("div", id="historical-data").find_all("tr", class_="text-right")
+	result = []
 	for row in rows[::-1]:
 		tds = row.find_all("td")
 
@@ -57,6 +55,6 @@ def downloadUsdPriceData(currency, db):
 
 		date = dateutilParser.parse(tds[0].text)
 		price = float(tds[4].text.replace(",", ""))
-		db.queryNoReturnNoCommit("INSERT INTO priceUsd_" + currency + " (timestamp, price, marketcap, totalExchangeVolume) VALUES (%s, %s, %s, %s)", 
-				(date, price, marketcap, volume))
-	db.commit()
+		result.append((date, price, marketcap, volume))
+		
+	priceStorageAccess.storePrices(result)

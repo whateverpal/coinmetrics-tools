@@ -1,7 +1,8 @@
 from datetime import timedelta, datetime
+from coincrawler.blocks import mineableCurrencyColumns, nonmineableCurrencyColumns
 import json
 
-def dumpDailyStatsToCSV(currency, db):
+def dumpDailyStatsToCSV(currency, storage):
 	print "%s dump started" % currency
 	allData = []
 	txVolumeByDay = {}
@@ -9,16 +10,18 @@ def dumpDailyStatsToCSV(currency, db):
 	generatedCoinsByDay = {}
 	feesByDay = {}
 
+	blockStorageAccess = storage.getBlockStorageAccess(currency, mineableCurrencyColumns if currency != "xem" else nonmineableCurrencyColumns)
+	priceStorageAccess = storage.getPriceStorageAccess(currency)
+
 	blocksTableName = "blocks_" + currency
-	blocksCount = int(db.queryReturnOne("SELECT height FROM %s ORDER BY height DESC LIMIT 1" % blocksTableName)[0])
+	blocksCount = blockStorageAccess.getBlockHeight()
 	print "blocks count: %d" % blocksCount
 	batchSize = 1000000
 	batchCount = blocksCount / batchSize + 1 if blocksCount % batchSize != 0 else blocksCount / batchSize
 	for i in xrange(batchCount):
 		offset = i * batchSize
 		print "fetching %d blocks starting from %d" % (batchSize, offset)
-		blocks = db.queryReturnAll("SELECT timestamp, txVolume, txCount, generatedCoins, fees FROM " + blocksTableName + " ORDER BY HEIGHT ASC LIMIT %s OFFSET %s", 
-			(batchSize, offset))
+		blocks = blockStorageAccess.getBlocksRange(offset, batchSize)
 		print "fetched %d blocks" % len(blocks)
 		for block in blocks:
 			blockTimestamp = block[0].replace(second=0, microsecond=0, hour=0, minute=0) + timedelta(days=1)
@@ -33,8 +36,7 @@ def dumpDailyStatsToCSV(currency, db):
 			generatedCoinsByDay[intTimestamp] += 0.0 if block[3] is None else float(block[3])
 			feesByDay[intTimestamp] += 0.0 if block[4] is None else float(block[4])
 
-	pricesTableName = "priceUsd_" + currency
-	prices = db.queryReturnAll("SELECT timestamp, price, marketCap, totalExchangeVolume FROM " + pricesTableName)
+	prices = priceStorageAccess.getPrices()
 	for date, price, marketcap, exchangeVolume in prices:
 		row = [date]
 		intTimestamp = int((date - datetime(1970, 1, 1)).total_seconds())

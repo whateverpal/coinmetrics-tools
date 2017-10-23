@@ -24,6 +24,9 @@ class IDownloader(object):
 	def silence(self):
 		self.silent = True
 
+	def stop(self):
+		return
+
 
 class SerialDownloader(IDownloader):
 
@@ -76,6 +79,10 @@ class NetworkDownloader(IDownloader):
 		self.sleepBetweenRequests = sleepBetweenRequests
 		self.amountPerRequest = amountPerRequest
 		self.client = NetworkClient(host, port)
+		self.stopping = False
+
+	def stop(self):
+		self.stopping = True
 
 	def getBlockHeight(self):
 		result, error = self.client.issueCommand("getNetworkBlockHeight", self.currency)
@@ -87,7 +94,7 @@ class NetworkDownloader(IDownloader):
 	def loadBlocks(self, blocksList):
 		fromHeight = blocksList[0]
 		toHeight = blocksList[-1]
-		jobId, error = self.client.issueCommand("startJob", self.currency, fromHeight, toHeight)
+		self.jobId, error = self.client.issueCommand("startJob", self.currency, fromHeight, toHeight)
 		if error is not None:
 			print error
 			raise Exception()
@@ -95,10 +102,11 @@ class NetworkDownloader(IDownloader):
 		eta = BlockCollectionETA(toHeight - fromHeight + 1, self.etaMaxObservations, self.etaReportInterval, silent=self.silent)
 		height = fromHeight
 		skipWorkStarted = False
-		while height <= toHeight:
+		while height <= toHeight and not self.stopping:
 			if not skipWorkStarted:
 				eta.workStarted()
-			result, error = self.client.issueCommand("getJobResult", jobId, height, height + self.amountPerRequest)
+
+			result, error = self.client.issueCommand("getJobResult", self.jobId, height, height + self.amountPerRequest)
 			if error is not None:
 				print error
 				raise Exception()
@@ -123,7 +131,7 @@ class NetworkDownloader(IDownloader):
 			if self.sleepBetweenRequests > 0:
 				time.sleep(self.sleepBetweenRequests)
 
-		self.client.issueCommand("stopJob", jobId)
+		self.client.issueCommand("stopJob", self.jobId)
 
 
 class MultisourceDownloader(IDownloader):
@@ -141,6 +149,11 @@ class MultisourceDownloader(IDownloader):
 		self.deadDownloadersCount = 0
 		self.deadDownloadersCountLock = threading.Lock()
 
+	def stop(self):
+		self.working = False
+		for downloader in self.downloaders:
+			downloader.stop()
+		
 	def getBlockHeight(self):
 		return self.downloaders[0].getBlockHeight()
 
@@ -165,7 +178,7 @@ class MultisourceDownloader(IDownloader):
 
 		eta = BlockCollectionETA(len(blocksList), self.etaMaxObservations, self.etaReportInterval)
 		eta.workStarted()
-		while self.currentBlock != blocksList[-1] + 1:
+		while self.currentBlock != blocksList[-1] + 1 and self.working:
 			if len(self.downloaders) == self.deadDownloadersCount:
 				raise Exception("all downloaders are dead")
 
