@@ -209,8 +209,8 @@ class BlockCollectionJob(object):
 					print "Stop signal received by the job"
 					break
 		except Exception as e:
-			print e
 			print "job failed!"
+			print traceback.format_exc()
 			self.setFailed(traceback.format_exc())
 			raise e
 

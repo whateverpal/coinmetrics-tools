@@ -6,6 +6,7 @@ import re
 from coincrawler.blockchain.bitcoin import BitcoinAccess
 from coincrawler.blockchain.ethereum import EthereumAccess
 from coincrawler.blockchain.monero import MoneroAccess
+from coincrawler.utils.network import hardenedRequestsGet
 from datetime import datetime
 
 class IDataSource(object):
@@ -44,14 +45,14 @@ class NemNinjaDataSource(IDataSource):
 class MainnetDecredOrgDataSource(IDataSource):
 
 	def getBlockHeight(self):
-		r =	requests.get("https://mainnet.decred.org/api/status?q=getInfo", timeout=10)
+		r =	hardenedRequestsGet("https://mainnet.decred.org/api/status?q=getInfo", timeout=10)
 		return r.json()["info"]["blocks"] - 20
 
 	def getBlock(self, height):
-		r = requests.get("https://mainnet.decred.org/api/block-index/%s" % height, timeout=10)
+		r = hardenedRequestsGet("https://mainnet.decred.org/api/block-index/%s" % height, timeout=10)
 		blockHash = r.json()["blockHash"]
 		
-		r = requests.get("https://mainnet.decred.org/api/block/%s" % blockHash, timeout=10)
+		r = hardenedRequestsGet("https://mainnet.decred.org/api/block/%s" % blockHash, timeout=10)
 		data = r.json()
 		
 		blockTimestamp = dateutilParser.parse(data['unixtime'])
@@ -61,7 +62,7 @@ class MainnetDecredOrgDataSource(IDataSource):
 		txVolume = 0.0
 		fees = 0.0
 		for txid in data['tx']:
-			r = requests.get("https://mainnet.decred.org/api/tx/%s" % txid, timeout=10)
+			r = hardenedRequestsGet("https://mainnet.decred.org/api/tx/%s" % txid, timeout=10)
 			if r.status_code == 404:
 				print "404 CODE FOR TX %s" % txid
 				continue
@@ -76,7 +77,7 @@ class MainnetDecredOrgDataSource(IDataSource):
 				if 'coinbase' in inputData:
 					isCoinbase = True
 				else:
-					r = requests.get("https://mainnet.decred.org/api/tx/%s" % inputData['txid'], timeout=10)
+					r = hardenedRequestsGet("https://mainnet.decred.org/api/tx/%s" % inputData['txid'], timeout=10)
 					key = frozenset(r.json()['vout'][inputData['vout']]['scriptPubKey']['addresses'])
 					if not key in inputs:
 						inputs[key] = 0
