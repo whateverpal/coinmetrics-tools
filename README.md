@@ -13,9 +13,9 @@ Python modules: psycopg2, bs4, python-dateutil, lmdb, requests.
 
 ### Supported cryptocurrencies
 
-Coincrawler supports Bitcoin, Litecoin, Dash, PIVX, Monero, Dogecoin, Decred, XEM, Ethereum, Ethereum Classic, ZCash and, probably, many other currencies based on Bitcoin code.
+Coincrawler supports Bitcoin, Litecoin, Dash, PIVX, Monero, Dogecoin, Decred, XEM, Ethereum, Ethereum Classic, ZCash, Vertcoin and, probably, many other currencies based on Bitcoin or Ethereum code.
 
-Bitcoin, Litecoin, Dash, Dogecoin, PIVX, ZCash data is fetched from blockchains via RPC API.
+Bitcoin, Litecoin, Dash, Dogecoin, PIVX, ZCash and Vertcoin data is fetched from blockchains via RPC API.
 
 Decred and XEM data is fetched from block explorers https://mainnet.decred.org and http://chain.nem.ninja respectively.
 
