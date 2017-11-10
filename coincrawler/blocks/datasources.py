@@ -45,14 +45,14 @@ class NemNinjaDataSource(IDataSource):
 class MainnetDecredOrgDataSource(IDataSource):
 
 	def getBlockHeight(self):
-		r =	hardenedRequestsGet("https://mainnet.decred.org/api/status?q=getInfo", timeout=10)
+		r =	hardenedRequestsGet("https://mainnet.decred.org/api/status?q=getInfo", timeout=10, jsonResponse=True)
 		return r.json()["info"]["blocks"] - 20
 
 	def getBlock(self, height):
-		r = hardenedRequestsGet("https://mainnet.decred.org/api/block-index/%s" % height, timeout=10)
+		r = hardenedRequestsGet("https://mainnet.decred.org/api/block-index/%s" % height, timeout=10, jsonResponse=True)
 		blockHash = r.json()["blockHash"]
 		
-		r = hardenedRequestsGet("https://mainnet.decred.org/api/block/%s" % blockHash, timeout=10)
+		r = hardenedRequestsGet("https://mainnet.decred.org/api/block/%s" % blockHash, timeout=10, jsonResponse=True)
 		data = r.json()
 		
 		blockTimestamp = dateutilParser.parse(data['unixtime'])
@@ -62,7 +62,7 @@ class MainnetDecredOrgDataSource(IDataSource):
 		txVolume = 0.0
 		fees = 0.0
 		for txid in data['tx']:
-			r = hardenedRequestsGet("https://mainnet.decred.org/api/tx/%s" % txid, timeout=10)
+			r = hardenedRequestsGet("https://mainnet.decred.org/api/tx/%s" % txid, timeout=10, jsonResponse=True)
 			if r.status_code == 404:
 				print "404 CODE FOR TX %s" % txid
 				continue
@@ -73,16 +73,19 @@ class MainnetDecredOrgDataSource(IDataSource):
 			sumInputs = 0.0
 
 			isCoinbase = False
+			nInputs = 0
 			for inputData in txData['vin']:
 				if 'coinbase' in inputData:
 					isCoinbase = True
 				else:
-					r = hardenedRequestsGet("https://mainnet.decred.org/api/tx/%s" % inputData['txid'], timeout=10)
+					r = hardenedRequestsGet("https://mainnet.decred.org/api/tx/%s" % inputData['txid'], timeout=10, jsonResponse=True)
 					key = frozenset(r.json()['vout'][inputData['vout']]['scriptPubKey']['addresses'])
 					if not key in inputs:
 						inputs[key] = 0
 					inputs[key] += inputData['amountin']
 					sumInputs += inputData['amountin']
+				nInputs += 1
+				print "inputs processed %d / %d" % (nInputs, len(txData['vin']))
 			if isCoinbase:
 				continue
 

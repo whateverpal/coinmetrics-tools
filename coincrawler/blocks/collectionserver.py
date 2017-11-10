@@ -66,7 +66,7 @@ class BlockCollectionJobExecutor(object):
 			with self.jobsLock:
 				for key, value in self.jobsLastAccess.iteritems():
 					print "gc thread: testing job %d, last access %d second(s) ago" % (key, (now - value).total_seconds())
-					if (now - value).total_seconds() > 15 * 60:
+					if (now - value).total_seconds() > 5 * 60:
 						toRemove.append(key)
 
 				for jobId in toRemove:
@@ -208,11 +208,11 @@ class BlockCollectionJob(object):
 				if self.stopping:
 					print "Stop signal received by the job"
 					break
-		except Exception as e:
+		except:
 			print "job failed!"
 			print traceback.format_exc()
 			self.setFailed(traceback.format_exc())
-			raise e
+			raise
 
 	def getFailed(self):
 		return self.failed

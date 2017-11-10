@@ -83,6 +83,10 @@ class BitcoinAccess(JsonRpcCaller):
 					address = bech32.encode("bc", 0, [ord(symbol) for symbol in binascii.unhexlify(rtxHex[4:])])
 					vout['scriptPubKey']['addresses'] = [address]
 
+				# pivx: use zerocoinmint output's hex as a fake address
+				if self.isPivx and vout['scriptPubKey']['type'] == 'zerocoinmint':
+				 	vout['scriptPubKey']['addresses'] = [vout['scriptPubKey']['hex']]
+
 				if 'asm' in vout['scriptPubKey']:
 					del vout['scriptPubKey']['asm']
 				if 'hex' in vout['scriptPubKey']:

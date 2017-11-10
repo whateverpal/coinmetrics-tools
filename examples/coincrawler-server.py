@@ -13,6 +13,7 @@ dataSources = {
 	"zec": 	lambda: BitcoinBlockchainDataSource("localhost", 13333, "rpcuser", "rpcpassword", 5, useLMDBCache=True, lmdbCachePath="/path/to/zcash/cache"),
 	"doge": lambda: BitcoinBlockchainDataSource("localhost", 19999, "rpcuser", "rpcpassword", 10, useLMDBCache=True, lmdbCachePath="/path/to/doge/cache"),
 	"ltc": 	lambda: BitcoinBlockchainDataSource("localhost", 20002, "rpcuser", "rpcpassword", 10, useLMDBCache=True, lmdbCachePath="/path/to/ltc/cache"),
+	"vtc": 	lambda: BitcoinBlockchainDataSource("localhost", 20005, "rpcuser", "rpcpassword", 20, useLMDBCache=True, lmdbCachePath="/path/to/vtc/cache"),
 	# for PIVX, pass isPivx=True
 	"pivx": lambda: BitcoinBlockchainDataSource("localhost", 20005, "rpcuser", "rpcpassword", 20, useLMDBCache=True, lmdbCachePath="/path/to/pivx/cache", isPivx=True),
 	

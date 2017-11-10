@@ -16,7 +16,8 @@ cmcTickerTranslation = {
 	"zec": "zcash", 
 	"doge": "dogecoin", 
 	"etc": "ethereum-classic", 
-	"pivx": "pivx"
+	"pivx": "pivx",
+	"vtc": "vertcoin"
 }
 
 def downloadUsdPriceData(currency, db):
