@@ -26,3 +26,7 @@ Monero data can be fetched either from blockchain or https://moneroexplorer.com.
 ### How to use
 
 Please look at files in the examples folder. Coincrawler is a client-server software: postgres database hosting machine fetches data from servers on which cryptocurrency nodes run. 
+
+### PIVX support notes
+
+Correct processing of spent zerocoin outputs relies on the modified version of PIVX node, which you can find here: https://github.com/whateverpal/PIVX/tree/getspentzerocoinamount.
