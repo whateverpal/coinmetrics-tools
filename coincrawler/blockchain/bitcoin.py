@@ -52,9 +52,10 @@ class BitcoinAccess(JsonRpcCaller):
 				justArrived[txid] = cachedResult
 			else:
 				result.append(None)
-				if not txid in notInCache:
-					notInCache[txid] = []
-				notInCache[txid].append(len(result) - 1)
+				if not (self.isPivx and txid == "0000000000000000000000000000000000000000000000000000000000000000"):
+					if not txid in notInCache:
+						notInCache[txid] = []
+					notInCache[txid].append(len(result) - 1)
 
 		notInCacheList = notInCache.keys()
 		notInCacheResult = []
@@ -108,7 +109,7 @@ class BitcoinAccess(JsonRpcCaller):
 
 		return result
 
-	def getTxInputOutputInfo(self, txInfo):
+	def getTxInputOutputInfo(self, txInfo, txid):
 		outputInfo = {frozenset(["nonstandard"]): 0.0}
 		outputs = txInfo['vout']
 		for output in outputs:
@@ -129,6 +130,15 @@ class BitcoinAccess(JsonRpcCaller):
 		for i in xrange(len(inputs)):
 			inputTx = inputs[i]
 			inputTxInfo = inputBulkData[i]
+			# pivx zerocoin input
+			if self.isPivx and inputTxInfo is None:
+				amount = self.call("getspentzerocoinamount", [txid, i])
+				zeroKey = frozenset(["zerocoin"])
+				if not zeroKey in inputInfo:
+					inputInfo[zeroKey] = 0.0
+				inputInfo[zeroKey] += amount / 100000000.0
+				continue
+
 			usedOutput = inputTxInfo['vout'][inputTx['vout']]
 			outputType = usedOutput['scriptPubKey']['type']
 			if outputType != 'nonstandard' and outputType != 'nulldata':
@@ -152,14 +162,16 @@ class BitcoinAccess(JsonRpcCaller):
 		fees = 0.0
 		volume = 0.0
 		startIndex = 0 if not isPivxPoS else 1
+		index = startIndex
 		for txData in txsData[startIndex:]:
-			inputInfo, outputInfo = self.getTxInputOutputInfo(txData)
+			inputInfo, outputInfo = self.getTxInputOutputInfo(txData, block['tx'][1 + index])
 			sumInputs = 0
 			for amount in inputInfo.values():
 				sumInputs += amount
 			sumOutputs = 0
 			for amount in outputInfo.values():
 				sumOutputs += amount
+			index += 1
 
 			# ZEC
 			if "vjoinsplit" in txData:
@@ -193,7 +205,7 @@ class BitcoinAccess(JsonRpcCaller):
 			generatedCoins = 0.0
 			txCount -= 1
 			stakeTransaction = self.getRawTransactionsEfficiently([block['tx'][1]])[0]
-			inputInfo, outputInfo = self.getTxInputOutputInfo(stakeTransaction)
+			inputInfo, outputInfo = self.getTxInputOutputInfo(stakeTransaction, block['tx'][1])
 			sumInputs = 0
 			for amount in inputInfo.values():
 				sumInputs += amount
