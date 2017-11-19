@@ -136,7 +136,7 @@ class BitcoinAccess(JsonRpcCaller):
 				zeroKey = frozenset(["zerocoin"])
 				if not zeroKey in inputInfo:
 					inputInfo[zeroKey] = 0.0
-				inputInfo[zeroKey] += amount / 100000000.0
+				inputInfo[zeroKey] += float(amount)
 				continue
 
 			usedOutput = inputTxInfo['vout'][inputTx['vout']]

@@ -20,7 +20,7 @@ cmcTickerTranslation = {
 	"vtc": "vertcoin"
 }
 
-def downloadUsdPriceData(currency, db):
+def downloadUsdPriceData(currency, db, fillHoles=False):
 	priceStorageAccess = db.getPriceStorageAccess(currency)
 	priceStorageAccess.flushPrices()
 
@@ -57,5 +57,24 @@ def downloadUsdPriceData(currency, db):
 		date = dateutilParser.parse(tds[0].text)
 		price = float(tds[4].text.replace(",", ""))
 		result.append((date, price, marketcap, volume))
+
+	if fillHoles:
+		while True:
+			holesFound = False
+			prevDate = result[0][0]
+			index = 1
+			for row in result[1:]:
+				diff = row[0] - prevDate
+				if diff > timedelta(days=1):
+					holesFound = True
+					print "Missing price for %s" % (prevDate + timedelta(days=1))
+					result.insert(index, (prevDate + timedelta(days=1), row[1], row[2], row[3]))
+					break
+				prevDate = row[0]
+				index += 1
+
+			if not holesFound:
+				break
+
 		
 	priceStorageAccess.storePrices(result)

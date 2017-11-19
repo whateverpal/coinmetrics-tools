@@ -56,7 +56,7 @@ def dumpDailyStatsToCSV(currency, storage):
 	f = open("csv/%s.csv" % currency, "w")
 	f.write("date,txVolume(USD),txCount,marketcap(USD),price(USD),exchangeVolume(USD),generatedCoins,fees\n")
 	for date, txVolume, txCount, generatedCoins, fees, price, mcap, exchangeVolume in allData:
-		f.write(date.strftime('%Y/%m/%d') + ",")
+		f.write(date.strftime('%Y-%m-%d') + ",")
 		f.write(",".join([str(txVolume), str(txCount), str(mcap), str(price), str(exchangeVolume), str(generatedCoins), str(fees)]))
 		f.write(",")
 		f.write("\n")
