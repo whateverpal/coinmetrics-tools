@@ -21,7 +21,7 @@ class IDataSource(object):
 class NemNinjaDataSource(IDataSource):
 
 	def getBlockHeight(self):
-		return int(json.loads(requests.get("http://chain.nem.ninja/api3/blocks", timeout=10).text)[0]["height"]) - 40
+		return int(json.loads(requests.get("http://chain.nem.ninja/api3/blocks", timeout=10).text)[0]["height"]) - 50
 
 	def getBlock(self, height):
 		blockData = json.loads(requests.get("http://chain.nem.ninja/api3/block?height=%s" % height, timeout=10).text)
@@ -46,7 +46,7 @@ class MainnetDecredOrgDataSource(IDataSource):
 
 	def getBlockHeight(self):
 		r =	hardenedRequestsGet("https://mainnet.decred.org/api/status?q=getInfo", timeout=10, jsonResponse=True)
-		return r.json()["info"]["blocks"] - 20
+		return r.json()["info"]["blocks"] - 40
 
 	def getBlock(self, height):
 		r = hardenedRequestsGet("https://mainnet.decred.org/api/block-index/%s" % height, timeout=10, jsonResponse=True)
@@ -145,7 +145,7 @@ class EthereumBlockchainDataSource(IDataSource):
 
 	def __init__(self, host, port):
 		self.ethereumAccess = EthereumAccess(host, port)
-		self.networkBlocksCount = self.ethereumAccess.getBlockCount() - 100
+		self.networkBlocksCount = self.ethereumAccess.getBlockCount() - 400
 
 	def getBaseBlockReward(self, height):
 		BYZANTIUM_FORK_HEIGHT = 4370000
@@ -155,7 +155,7 @@ class EthereumBlockchainDataSource(IDataSource):
 			return 3.0
 
 	def getBlockHeight(self):
-		return self.networkBlocksCount - 100
+		return self.networkBlocksCount
 
 	def getBlock(self, height):
 		blockInfo = self.ethereumAccess.getBlockByHeight(height)
@@ -165,7 +165,7 @@ class EthereumBlockchainDataSource(IDataSource):
 		fees = 0.0
 		txCount = len(blockInfo['transactions'])
 
-		receipts = self.ethereumAccess.bulkCall([("eth_getTransactionReceipt", [tx['hash']]) for tx in blockInfo['transactions']])
+		receipts = self.ethereumAccess.bulkCall([("eth_getTransactionReceipt", [tx['hash']]) for tx in blockInfo['transactions']]) if txCount > 0 else []
 
 		index = 0
 		for tx in blockInfo['transactions']:
@@ -199,33 +199,6 @@ class EthereumClassicBlockchainDataSource(EthereumBlockchainDataSource):
 		return 5.0
 
 
-class EtherChainDataSource(IDataSource):
-
-	def getBlockHeight(self):
-		r = requests.get("https://etherchain.org/api/blocks/count", timeout=10)
-		return r.json()["data"][0]["count"] - 100
-
-	def getBlock(self, height):
-		r = requests.get("https://etherchain.org/api/block/%s" % height, timeout=10)
-		data = r.json()['data'][0]
-		blockTimestamp = dateutilParser.parse(data['time'])
-		difficulty = data['difficulty']
-		generatedCoins = float(data['reward']) / 1000000000000000000
-		fees = float(data['totalFee']) / 1000000000000000000
-		generatedCoins -= fees
-
-		r = requests.get("https://etherchain.org/api/block/%s/tx" % height, timeout=10)
-		blockTxData = r.json()["data"]
-		txCount = 0
-		txVolume = 0.0
-		for txData in blockTxData:
-			amount = float(txData['amount']) / 1000000000000000000
-			txCount += 1
-			txVolume += amount
-
-		return {"height": height, "timestamp": blockTimestamp, "difficulty": difficulty, "generatedCoins": generatedCoins, "fees": fees, "txCount": txCount, "txVolume": txVolume}
-
-
 class MoneroBlockchainDataSource(IDataSource):
 
 	def __init__(self, host, port):
@@ -246,27 +219,5 @@ class MoneroBlockchainDataSource(IDataSource):
 		fees = coinbase['fee_amount'] / 1000000000000.0
 		generatedCoins = coinbase['emission_amount'] / 1000000000000.0
 		return {"height": height, "timestamp": timestamp, "difficulty": difficulty, "generatedCoins": generatedCoins, "fees": fees, "txCount": txCount, "txVolume": 0.0}
-
-
-class MoneroExplorerDataSource(IDataSource):
-
-	def getBlockHeight(self):
-		r = requests.get("https://moneroexplorer.com", timeout=10)
-		soup = BeautifulSoup(r.text, 'html.parser')
-		return int(soup.find_all(class_="primary table")[1].find("a").text) - 50
-
-	def getBlock(self, height):
-		r = requests.get("https://moneroexplorer.com/block/%s" % height, timeout=10)
-		soup = BeautifulSoup(r.text, 'html.parser')
-		txCount = int(soup.find_all("h3")[1].text.split("(")[1].split(")")[0])
-
-		timestamp = dateutilParser.parse(soup.find(class_="primary table").find_all("td")[0].text.split("):")[1].split("(")[0])
-		generatedCoins = float(soup.find(class_="primary table").find_all("tr")[1].find_all("td")[1].text.split(":")[1])
-		if txCount == 0:
-			fees = 0.0
-		else:
-			fees = float(soup.find(class_="primary table").find_all("tr")[2].find_all("td")[1].text.split(":")[1])
-
-		return {"height": height, "timestamp": timestamp, "difficulty": 0, "generatedCoins": generatedCoins, "fees": fees, "txCount": txCount, "txVolume": 0.0}
 
 

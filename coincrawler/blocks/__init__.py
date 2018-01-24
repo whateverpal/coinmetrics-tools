@@ -2,12 +2,8 @@ from downloaders import NetworkDownloader, MultisourceDownloader
 from datetime import datetime
 import os
 
-mineableCurrencyColumns = ["height", "timestamp", "txVolume", "txCount", "generatedCoins", "fees", "difficulty"]
-nonmineableCurrencyColumns = ["height", "timestamp", "txVolume", "txCount", "fees"]
-
 def fetchBlocksFromServers(currency, hostsAndPorts, sleepBetweenRequests, countPerJob, storage, stopSignal=None):
-	columns = nonmineableCurrencyColumns if currency == "xem" else mineableCurrencyColumns
-	blockStorageAccess = storage.getBlockStorageAccess(currency, columns)
+	blockStorageAccess = storage.getBlockStorageAccess(currency)
 	downloaders = []
 	for host, port in hostsAndPorts:
 		downloader = NetworkDownloader(currency, host, port, sleepBetweenRequests=sleepBetweenRequests, amountPerRequest=countPerJob)

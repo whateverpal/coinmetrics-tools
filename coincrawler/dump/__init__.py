@@ -1,5 +1,4 @@
 from datetime import timedelta, datetime
-from coincrawler.blocks import mineableCurrencyColumns, nonmineableCurrencyColumns
 import json
 
 def dumpDailyStatsToCSV(currency, storage):
@@ -10,7 +9,7 @@ def dumpDailyStatsToCSV(currency, storage):
 	generatedCoinsByDay = {}
 	feesByDay = {}
 
-	blockStorageAccess = storage.getBlockStorageAccess(currency, mineableCurrencyColumns if currency != "xem" else nonmineableCurrencyColumns)
+	blockStorageAccess = storage.getBlockStorageAccess(currency)
 	priceStorageAccess = storage.getPriceStorageAccess(currency)
 
 	blocksTableName = "blocks_" + currency
@@ -24,7 +23,7 @@ def dumpDailyStatsToCSV(currency, storage):
 		blocks = blockStorageAccess.getBlocksRange(offset, batchSize)
 		print "fetched %d blocks" % len(blocks)
 		for block in blocks:
-			blockTimestamp = block[0].replace(second=0, microsecond=0, hour=0, minute=0) + timedelta(days=1)
+			blockTimestamp = block[0].replace(second=0, microsecond=0, hour=0, minute=0)
 			intTimestamp = int((blockTimestamp - datetime(1970, 1, 1)).total_seconds())
 			if not intTimestamp in txVolumeByDay:
 				txVolumeByDay[intTimestamp] = 0.0
@@ -45,12 +44,17 @@ def dumpDailyStatsToCSV(currency, storage):
 			row.append(str(txCountByDay[intTimestamp]))
 			row.append(str(generatedCoinsByDay[intTimestamp]))
 			row.append(str(feesByDay[intTimestamp]))
-			row.append(str(float(price)))
-			row.append(str(float(marketcap)))
-			row.append(str(float(exchangeVolume)))
-			allData.append(row)
 		else:
+			row.append("null")
+			row.append("null")
+			row.append("null")
+			row.append("null")
 			print "missing timestamp for %s: %s" % (currency, str(intTimestamp))
+		row.append(str(float(price)))
+		row.append(str(float(marketcap)))
+		row.append(str(float(exchangeVolume)))
+
+		allData.append(row)
 	allData = sorted(allData, key=lambda elem: elem[0])
 
 	f = open("csv/%s.csv" % currency, "w")

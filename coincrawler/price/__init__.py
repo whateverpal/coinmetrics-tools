@@ -17,7 +17,18 @@ cmcTickerTranslation = {
 	"doge": "dogecoin", 
 	"etc": "ethereum-classic", 
 	"pivx": "pivx",
-	"vtc": "vertcoin"
+	"vtc": "vertcoin",
+	"xrp": "ripple",
+	"xvg": "verge",
+	"dgb": "digibyte",
+	"btg": "bitcoin-gold",
+	"eos": "eos",
+	"trx": "tron",
+	"icx": "icon",
+	"qtum": "qtum",
+	"ppt": "populous",
+	"omg": "omisego",
+	"bnb": "binance-coin",
 }
 
 def downloadUsdPriceData(currency, db, fillHoles=False):
@@ -34,6 +45,7 @@ def downloadUsdPriceData(currency, db, fillHoles=False):
 		day = "0" + day
 	endDate = year + month + day
 	startDate = "20100101" if currency != "bch" else "20170731"
+	startDate = startDate if currency != "btg" else "20171113"
 	r = requests.get("https://coinmarketcap.com/currencies/%s/historical-data/?start=%s&end=%s" % (cmcTickerTranslation[currency], startDate, endDate), timeout=30)
 	soup = BeautifulSoup(r.text, 'html.parser')
 
@@ -55,7 +67,7 @@ def downloadUsdPriceData(currency, db, fillHoles=False):
 			marketcap = float(marketcap.replace(",", ""))
 
 		date = dateutilParser.parse(tds[0].text)
-		price = float(tds[4].text.replace(",", ""))
+		price = float(tds[1].text.replace(",", ""))
 		result.append((date, price, marketcap, volume))
 
 	if fillHoles:

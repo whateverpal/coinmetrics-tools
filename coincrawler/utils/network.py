@@ -1,12 +1,12 @@
 import requests
 import time
 
-def hardenedRequestsGet(url, timeout=10, maxRetries=5, sleepBetweenRetries=10, jsonResponse=False):
+def hardenedRequestsGet(url, timeout=10, maxRetries=5, sleepBetweenRetries=10, jsonResponse=False, verify=True):
 	result = None
 	retries = 0
 	while result is None:
 		try:
-			result = requests.get(url, timeout=timeout)
+			result = requests.get(url, timeout=timeout, verify=verify)
 		except (requests.exceptions.ConnectionError, requests.exceptions.ReadTimeout) as e:
 			if retries < maxRetries:
 				retries += 1

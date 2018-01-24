@@ -4,7 +4,7 @@ import json
 
 class NetworkClient(object):
 
-	def __init__(self, host, port, maxRetries=12, maxTimeout=10):
+	def __init__(self, host, port, maxRetries=60, maxTimeout=10):
 		self.host = host
 		self.port = port
 		self.maxRetries = maxRetries
@@ -19,7 +19,7 @@ class NetworkClient(object):
 			except (requests.exceptions.ConnectionError, requests.exceptions.ReadTimeout) as e:
 				if retries < self.maxRetries:
 					retries += 1
-					print "failed to issue command due to connection error or timeout, resending request"
+					print "failed to issue command due to connection error or timeout, resending request, retries left %d" % (self.maxRetries - retries)
 					print e
 					time.sleep(10)
 					continue

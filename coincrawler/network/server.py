@@ -24,9 +24,10 @@ class NetworkServer(object):
 		def do_GET(self):
 			self.server.owner.processRequest(self)
 
-	def __init__(self, port, executor, inputExecutor=None):
+	def __init__(self, serverAddress, port, executor, inputExecutor=None):
+		self.serverAddress = serverAddress
 		self.port = port
-		self.server = ThreadedHTTPServer(("0.0.0.0", port), NetworkServer.Handler)
+		self.server = ThreadedHTTPServer((serverAddress, port), NetworkServer.Handler)
 		self.server.owner = self
 		self.executor = executor
 		self.inputExecutor = inputExecutor
@@ -58,7 +59,7 @@ class NetworkServer(object):
 	def start(self):
 		self.thread = threading.Thread(None, self.threadFunc, "", ())
 		self.thread.start()
-		print "Http server started, using port %s" % self.port
+		print "Http server started, using port %s, address %s" % (self.port, self.serverAddress)
 
 	def stop(self):
 		self.server.shutdown()

@@ -10,10 +10,10 @@ from coincrawler.network.server import NetworkServer
 
 class BlockCollectionServer(NetworkServer):
 
-	def __init__(self, port, dataSources, dataSourcesSleepBetweenRequests):
-		executor = BlockCollectionJobExecutor(dataSources, dataSourcesSleepBetweenRequests)
+	def __init__(self, serverAddress, port, dataSources):
+		executor = BlockCollectionJobExecutor(dataSources, {})
 		inputExecutor = BlockCollectionInputExecutor(executor)
-		super(BlockCollectionServer, self).__init__(port, executor, inputExecutor)
+		super(BlockCollectionServer, self).__init__(serverAddress, port, executor, inputExecutor)
 
 
 class BlockCollectionInputExecutor(object):

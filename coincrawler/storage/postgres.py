@@ -1,12 +1,14 @@
 from coincrawler.storage import IStorage, IBlockStorageAccess, IPriceStorageAccess
 
+mineableCurrencyColumns = ["height", "timestamp", "txVolume", "txCount", "generatedCoins", "fees", "difficulty"]
+nonmineableCurrencyColumns = ["height", "timestamp", "txVolume", "txCount", "fees"]
+
 class PostgresStorage(IStorage):
 
 	def __init__(self, dbHost, dbName, dbUser, dbPassword):
 		import psycopg2
 		self.connection = psycopg2.connect("host=%s dbname=%s user=%s password=%s" % (dbHost, dbName, dbUser, dbPassword))
 		self.cursor = self.connection.cursor()
-		print "DB connection established"
 
 	def __del__(self):
 		self.close()
@@ -32,9 +34,9 @@ class PostgresStorage(IStorage):
 	def close(self):
 		self.cursor.close()
 		self.connection.close()
-		print "DB connection terminated"
 
-	def getBlockStorageAccess(self, currency, columns):
+	def getBlockStorageAccess(self, currency):
+		columns = mineableCurrencyColumns if currency != "xem" else nonmineableCurrencyColumns
 		return PostgresStorageBlockAccess(currency, columns, self)
 
 	def getPriceStorageAccess(self, currency):
@@ -66,6 +68,13 @@ class PostgresStorageBlockAccess(IBlockStorageAccess):
 		result = self.db.queryReturnAll("SELECT height FROM %s ORDER BY height DESC LIMIT 1" % self.tableName)
 		if len(result) > 0:
 			return int(result[0][0])
+		else:
+			return 0
+
+	def getBlockTimestamp(self, height):
+		result = self.db.queryReturnAll("SELECT timestamp FROM %s ORDER BY height DESC LIMIT 1" % self.tableName)
+		if len(result) > 0:
+			return result[0][0]
 		else:
 			return 0
 

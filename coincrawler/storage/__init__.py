@@ -1,6 +1,6 @@
 class IStorage(object):
 
-	def getBlockStorageAccess(self, currency, columns):
+	def getBlockStorageAccess(self, currency):
 		return None
 
 	def getPriceStorageAccess(self, currency):
@@ -17,6 +17,9 @@ class IBlockStorageAccess(object):
 
 	def getBlocksRange(self, offset, count):
 		return []
+
+	def getBlockTimestamp(self, height):
+		return 0
 
 
 class IPriceStorageAccess(object):

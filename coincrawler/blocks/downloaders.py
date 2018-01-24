@@ -64,7 +64,7 @@ class SerialDownloader(IDownloader):
 						raise e
 
 			if not self.silent:
-				print "downloaded block %s" % prettyPrintBlock(block)
+				print datetime.now().time(), "downloaded block %s" % prettyPrintBlock(block)
 			eta.workFinished(1)
 
 			yield block
@@ -117,7 +117,7 @@ class NetworkDownloader(IDownloader):
 					receivedBlocks += 1
 					height += 1
 					if not self.silent:
-						print "downloaded block %s" % prettyPrintBlock(block)
+						print datetime.now().time(), "downloaded block %s" % prettyPrintBlock(block)
 					yield block
 				else:
 					break
@@ -183,7 +183,7 @@ class MultisourceDownloader(IDownloader):
 				raise Exception("all downloaders are dead")
 
 			while self.currentBlock in self.results:
-				print "downloaded block %s" % prettyPrintBlock(self.results[self.currentBlock])
+				print datetime.now().time().replace(microsecond=0).isoformat(), "downloaded block %s" % prettyPrintBlock(self.results[self.currentBlock])
 				yield self.results[self.currentBlock]
 				del self.results[self.currentBlock]
 				self.currentBlock += 1
