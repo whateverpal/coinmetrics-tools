@@ -1,6 +1,6 @@
 # Coinmetrics tools
 
-Repository for software created by coinmetrics.io team.
+PLEASE NOTE: coinmetrics.io software now lives at https://github.com/coinmetrics-io/
 
 ## Coincrawler
 
